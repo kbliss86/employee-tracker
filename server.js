@@ -1,7 +1,9 @@
+//required modules
 const inquirer = require('inquirer');
 const mysql = require('mysql2');
 const express = require('express');
 
+// connection settings to sql database
 const connection = mysql.createConnection({
     host: 'localhost',
     user: 'root',
@@ -9,12 +11,14 @@ const connection = mysql.createConnection({
     database: 'company_db'
 });
 
+// connect to mysql server and sql database
 connection.connect((err) => {
     if (err) throw err;
     console.log('connected as id ' + connection.threadId);
     start();
 });
 
+// function which prompts the user for what action they should take
 function start() {
     inquirer
         .prompt({
@@ -33,9 +37,9 @@ function start() {
                 'View all employees by manager',
                 'View all employees by department',
                 'Exit'
-                
             ]
         })
+        // switch case to call functions based on user selection
         .then((answer) => {
             switch (answer.action) {
                 case 'View all employees':
@@ -68,14 +72,16 @@ function start() {
                 case 'View all employees by department':
                     viewAllEmployeesByDepartment();
                     break;
+                    //exits out of the application
                 case 'Exit':
                     connection.end();
                     break;
             }
         });
 }
-
+// functions to view all employees, departments, and roles
 function viewAllEmployees() {
+    //select all fields from employee table
     connection.query('SELECT * FROM employee', (err, res) => {
         if (err) throw err;
         console.table(res);
@@ -84,6 +90,7 @@ function viewAllEmployees() {
 }
 
 function viewAllDepartments() {
+    //select all fields from department table
     connection.query('SELECT * FROM department', (err, res) => {
         if (err) throw err;
         console.table(res);
@@ -91,27 +98,31 @@ function viewAllDepartments() {
     });
 }
 function viewAllRoles() {
+    //select all fields from role table
     connection.query('SELECT * FROM role', (err, res) => {
         if (err) throw err;
         console.table(res);
         start();
     });
 }
-
+// functions to add employees, departments, and roles
 function addEmployee() {
     let roles = [];
     let managers = [];
-
+    // query to get roles and managers with promises to ensure they are ran in order
     const queryAsync = (queryString) => {
+        //when query is ran, return a promise
         return new Promise((resolve, reject) => {
+            //query the database
             connection.query(queryString, (err, res) => {
                 if (err) reject(err);
+                //resolve the promise with the results
                 resolve(res);
             });
         });
     };
 
-
+    //call queryAsync function to get roles and managers
     queryAsync('SELECT id, title FROM role')
         .then((res) => {
             roles = res.map(({id, title}) => ({
@@ -234,11 +245,11 @@ function addRole() {
             );
         });
 }
-
+// functions to update employee role and manager
 function updateEmployeeRole() {
     let employees = [];
     let roles = [];
-
+    // query to get employees and roles with promises to ensure they are ran in order
     const queryAsync = (queryString) => {
         return new Promise((resolve, reject) => {
             connection.query(queryString, (err, res) => {
@@ -300,8 +311,7 @@ function updateEmployeeRole() {
 function updateEmployeeManager() {
     let employees = [];
     let managers = [];
-        console.log(employees);
-        console.log(managers);
+     // query to get employees and managers with promises to ensure they are ran in order
     const queryAsync = (queryString) => {
         return new Promise((resolve, reject) => {
             connection.query(queryString, (err, res) => {
@@ -319,6 +329,7 @@ function updateEmployeeManager() {
 
         .then((res) => {
             managers = res.map(({id, first_name, last_name}) => ({ name: `${first_name} ${last_name}`, value: id }));
+            //allow user to select no manager
             managers.push({ name: 'None', value: null });
 
             return inquirer.prompt([
@@ -363,7 +374,7 @@ function updateEmployeeManager() {
             console.error("Error updating employee!", error);
         });
 }
-
+// functions to view all employees by manager and department
 function viewAllEmployeesByManager() {
     const query = `
     SELECT
@@ -389,6 +400,7 @@ function viewAllEmployeesByManager() {
 }
 
 function viewAllEmployeesByDepartment() {
+    //double join to get employee names and department names
     const query = `
     SELECT
         name AS department_name, 
