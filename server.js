@@ -29,7 +29,11 @@ function start() {
                 'Add department',
                 'Add role',
                 'Update employee role',
+                'Update employee manager',
+                'View all employees by manager',
+                'View all employees by department',
                 'Exit'
+                
             ]
         })
         .then((answer) => {
@@ -54,6 +58,15 @@ function start() {
                     break;
                 case 'Update employee role':
                     updateEmployeeRole();
+                    break;
+                case 'Update employee manager':
+                    updateEmployeeManager();
+                    break;
+                case 'View all employees by manager':
+                    viewAllEmployeesByManager();
+                    break;
+                case 'View all employees by department':
+                    viewAllEmployeesByDepartment();
                     break;
                 case 'Exit':
                     connection.end();
@@ -237,10 +250,7 @@ function updateEmployeeRole() {
 
     queryAsync('SELECT id, first_name, last_name FROM employee')
         .then((res) => {
-            employees = res.map(({id, first_name, last_name}) => ({
-                name: `${first_name} ${last_name}`,
-                value: id
-            }));
+            employees = res.map(({id, first_name, last_name}) => ({ name: `${first_name} ${last_name}`, value: id }));
             return queryAsync('SELECT id, title FROM role');
         })
         .then((res) => {
@@ -287,3 +297,118 @@ function updateEmployeeRole() {
             console.error("Error updating employee!", error);
         });
     }
+function updateEmployeeManager() {
+    let employees = [];
+    let managers = [];
+        console.log(employees);
+        console.log(managers);
+    const queryAsync = (queryString) => {
+        return new Promise((resolve, reject) => {
+            connection.query(queryString, (err, res) => {
+                if (err) reject(err);
+                resolve(res);
+            });
+        });
+    };
+
+    queryAsync('SELECT id, first_name, last_name FROM employee')
+        .then((res) => {
+            employees = res.map(({id, first_name, last_name}) => ({ name: `${first_name} ${last_name}`, value: id }));
+            return queryAsync('SELECT id, first_name, last_name FROM employee');
+        })
+
+        .then((res) => {
+            managers = res.map(({id, first_name, last_name}) => ({ name: `${first_name} ${last_name}`, value: id }));
+            managers.push({ name: 'None', value: null });
+
+            return inquirer.prompt([
+                {
+                    name: 'employee',
+                    type: 'list',
+                    message: 'Which employee would you like to update?',
+                    choices: employees
+                },
+                {
+                    name: 'manager',
+                    type: 'list',
+                    message: 'What is the employee\'s new manager?',
+                    choices: managers
+                }
+            ]);
+        })
+        .then((answer) => {
+            return new Promise((resolve, reject) => {
+                connection.query(
+                    'UPDATE employee SET ? WHERE ?',
+                    [
+                        {
+                            manager_id: answer.manager
+                        },
+                        {
+                            id: answer.employee
+                        }
+                    ],
+                    (err) => {
+                        if (err) throw err;
+                        console.log('Employee updated successfully!');
+                        resolve();
+                    }
+                );
+            });
+        })
+        .then(() => {
+            start();
+        })
+        .catch(error => {
+            console.error("Error updating employee!", error);
+        });
+}
+
+function viewAllEmployeesByManager() {
+    const query = `
+    SELECT
+        manager.id AS manager_id,
+        CONCAT(manager.first_name, ' ', manager.last_name) AS manager_name,
+        GROUP_CONCAT(CONCAT(employee.first_name, ' ', employee.last_name) ORDER BY employee.last_name ASC) AS employee_names
+    FROM 
+        employee
+    LEFT JOIN 
+        employee AS manager ON employee.manager_id = manager.id
+    WHERE
+        manager.id IS NOT NULL
+    GROUP BY
+        manager.id
+    ORDER BY
+        manager.last_name ASC;
+    `;
+    connection.query(query, (err, res) => {
+        if (err) throw err;
+        console.table(res);
+        start();
+    });
+}
+
+function viewAllEmployeesByDepartment() {
+    const query = `
+    SELECT
+        name AS department_name, 
+        GROUP_CONCAT(CONCAT(employee.first_name, ' ', employee.last_name) ORDER BY employee.last_name ASC) AS employee_names
+    FROM 
+        employee
+    JOIN 
+        role ON employee.role_id = role.id
+    JOIN
+        department ON role.department_id = department.id
+    WHERE
+        department.id IS NOT NULL
+    GROUP BY
+        department.id
+    ORDER BY
+        department_name ASC;
+    `;
+    connection.query(query, (err, res) => {
+        if (err) throw err;
+        console.table(res);
+        start();
+    });
+}
